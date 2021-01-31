@@ -138,7 +138,7 @@ def create_cltv_c(dataframe):
     return dataframe
 
 
-check_df(rfm) #düzeltilmiş hali
+check_df(rfm) 
 
 
 rfm_cltv = create_cltv_c(rfm)
@@ -165,18 +165,11 @@ def create_cltv_p(dataframe):
 
     rfm.rename(columns={"monetary": "monetary_avg"}, inplace=True)
 
-
-    # BGNBD için WEEKLY RECENCY VE WEEKLY T'nin HESAPLANMASI
-    ## recency_weekly_cltv_p
     rfm["recency_weekly_cltv_p"] = rfm["recency_cltv_p"] / 7
     rfm["T_weekly"] = rfm["T"] / 7
 
-
-
-    # KONTROL
     rfm = rfm[rfm["monetary_avg"] > 0]
 
-    ## recency filtre (daha saglıklı cltvp hesabı için)
     rfm = rfm[(rfm['frequency'] > 1)]
 
     rfm["frequency"] = rfm["frequency"].astype(int)
@@ -199,7 +192,7 @@ def create_cltv_p(dataframe):
                                            rfm['recency_weekly_cltv_p'],
                                            rfm['T_weekly'])
 
-    # expected_average_profit
+  
     ggf = GammaGammaFitter(penalizer_coef=0.01)
     ggf.fit(rfm['frequency'], rfm['monetary_avg'])
     rfm["expected_average_profit"] = ggf.conditional_expected_average_profit(rfm['frequency'],
@@ -223,8 +216,6 @@ def create_cltv_p(dataframe):
 
     rfm["cltv_p_segment"] = pd.qcut(rfm["cltv_p"], 3, labels=["C", "B", "A"])
 
-
-    ## recency_cltv_p, recency_weekly_cltv_p
     rfm = rfm[["recency_cltv_p", "T", "monetary_avg", "recency_weekly_cltv_p", "T_weekly",
                "exp_sales_1_month", "exp_sales_3_month", "expected_average_profit", "cltv_p", "cltv_p_segment" ]]
 
@@ -237,7 +228,6 @@ crm_final = rfm_cltv.merge(rfm_cltv_p, on="Customer ID", how="left")
 check_df(crm_final)
 
 crm_final.sort_values(by="monetary_avg", ascending=False).head()
-# yeni müşterilere değer biçip nasıl odaklanılacağına yönelik yol gösterir.
 crm_final.sort_values(by="cltv_p", ascending=False).head()
 
 
