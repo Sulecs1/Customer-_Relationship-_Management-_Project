@@ -13,43 +13,23 @@ from lifetimes import GammaGammaFitter
 pd.set_option('display.max_columns', None)
 
 pd.set_option('display.max_columns', None)
-##########################################
-# From csv
-##########################################
+
 
 data = pd.read_excel("datasets/online_retail_II.xlsx",
                     sheet_name="Year 2010-2011")
 df = data.copy()
 
-#########################################
-#From db
-#########################################
-#credentials
 creds = {'user': 'group4',
          'passwd': 'haydegidelum',
          'host': 'db.github.rocks',
          'port': 3306,
          'db': 'group4'}
-
-# MySQL conection string.
 connstr = 'mysql+mysqlconnector://{user}:{passwd}@{host}:{port}/{db}'
-
-
-#uzak sunucuya python tarafında işlem yapabiliriz
-
-# sqlalchemy engine for MySQL connection.
 conn = create_engine(connstr.format(**creds))
 
 mysql_df = pd.read_sql_query("select * from online_retail_2010_2011 limit 10", conn)
 type(mysql_df) #type dataframe
 mysql_df.info()
-# retail_mysql_df["InvoiceDate"] = pd.to_datetime(retail_mysql_df["InvoiceDate"])
-
-#####################################
-#Data Preperation
-####################################
-
-
 def check_df(dataframe):
         print("********************* Shape *********************")
         print(dataframe.shape)
@@ -62,7 +42,6 @@ def check_df(dataframe):
         print("********************* Quantiles *********************")
         print(dataframe.quantile([0, 0.05, 0.50, 0.95, 0.99, 1]).T)
 
-
 def outlier_thresholds(dataframe, variable):
     quartile1 = dataframe[variable].quantile(0.01)
     quartile3 = dataframe[variable].quantile(0.99)
@@ -71,14 +50,10 @@ def outlier_thresholds(dataframe, variable):
     low_limit = quartile1 - 1.5 * interquantile_range
     return low_limit, up_limit
 
-
 def replace_with_thresholds(dataframe, variable):
     low_limit, up_limit = outlier_thresholds(dataframe, variable)
-    # dataframe.loc[(dataframe[variable] < low_limit), variable] = low_limit
     dataframe.loc[(dataframe[variable] > up_limit), variable] = up_limit
 
-
-#data processing
 def crm_data_prep(dataframe):
     dataframe.dropna(axis=0, inplace=True)
     dataframe = dataframe[~dataframe["Invoice"].str.contains("C", na=False)]
@@ -93,14 +68,7 @@ check_df(df)  #verinin önceki hali
 df_prep = crm_data_prep(df) #işlenmiş veriyi yeni değişkene atadım
 check_df(df_prep) #işlenmiş verileri sorgulama
 
-##########################################
-# Creating RFM Segments
-##########################################
-
 def create_rfm(dataframe):
-    # RFM METRIKLERININ HESAPLANMASI
-    # Dikkat! RFM için frekanslar nunique.
-
     today_date = dt.datetime(2011, 12, 11)
 
     rfm = dataframe.groupby('Customer ID').agg({'InvoiceDate': lambda date: (today_date - date.max()).days,
@@ -111,14 +79,8 @@ def create_rfm(dataframe):
 
     rfm = rfm[(rfm['monetary'] > 0)] #CONTROL!!!
 
-
-    # RFM SKORLARININ HESAPLANMASI
     rfm["recency_score"] = pd.qcut(rfm['recency'], 5, labels=[5, 4, 3, 2, 1])
     rfm["frequency_score"] = pd.qcut(rfm["frequency"].rank(method="first"), 5, labels=[1, 2, 3, 4, 5])
-
-    # Monetary segment tanımlamada kullanılmadığı için işlemlere alınmadı.
-
-    # SEGMENTLERIN ISIMLENDIRILMESI
 
     rfm['rfm_segment'] = rfm['recency_score'].astype(str) + rfm['frequency_score'].astype(str)
 
@@ -143,10 +105,6 @@ def create_rfm(dataframe):
 rfm = create_rfm(df_prep)
 rfm.head()
 
-##########################################
-# Calculated CLTV
-##########################################
-#_c ->calculated temsili
 def create_cltv_c(dataframe):
     # avg_order_value
     dataframe['avg_order_value'] = dataframe['monetary'] / dataframe['frequency']
@@ -187,10 +145,6 @@ rfm_cltv = create_cltv_c(rfm)
 check_df(rfm_cltv)
 
 rfm_cltv.head()
-
-##########################################
-# Predicted CLTV
-##########################################
 
 def create_cltv_p(dataframe):
     today_date = dt.datetime(2011, 12, 11)
@@ -262,16 +216,11 @@ def create_cltv_p(dataframe):
                                                    discount_rate=0.01)
     rfm["cltv_p"] = cltv_sixth_month
 
-
-
-
-    # minmaxscaler
     scaler = MinMaxScaler(feature_range=(1, 100))
     scaler.fit(rfm[["cltv_p"]])
     rfm["cltv_p"] = scaler.transform(rfm[["cltv_p"]])
 
 
-    # cltv_p_segment
     rfm["cltv_p_segment"] = pd.qcut(rfm["cltv_p"], 3, labels=["C", "B", "A"])
 
 
@@ -291,15 +240,12 @@ crm_final.sort_values(by="monetary_avg", ascending=False).head()
 # yeni müşterilere değer biçip nasıl odaklanılacağına yönelik yol gösterir.
 crm_final.sort_values(by="cltv_p", ascending=False).head()
 
-##########################################
-# Veri Tabanına Gönderme
-##########################################
+
 crm_final.head()
-# Customer ID arıza çıkarmasın diye birleşik yazalım.
 crm_final.index.name = "CustomerID"
 
 crm_final.to_sql(name='crm_final_suleakcay',
                  con=conn,
                  if_exists='replace',
-                 index=True,  # index var o da aşağıdaki
+                 index=True,  
                  index_label="CustomerID")
